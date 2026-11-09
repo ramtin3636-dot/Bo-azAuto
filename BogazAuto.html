@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BoğazAuto – Balanced Glassmorphism Fleet Map</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Okunabilirliği Artırılmış, Dengeli Cam Efekti */
+        .premium-glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(6px) saturate(190%); /* Harita detayları süzülür, yazılar karışmaz */
+            -webkit-backdrop-filter: blur(6px) saturate(190%);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.04),
+                inset 0 1px 3px rgba(255, 255, 255, 0.5);
+        }
+        
+        .premium-glass-card {
+            background: rgba(255, 255, 255, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        
+        .premium-glass-card:hover {
+            background: rgba(255, 255, 255, 0.75);
+            border-color: rgba(6, 182, 212, 0.4);
+            transform: translateY(-1px);
+        }
+        
+        .premium-glass-card.active {
+            background: rgba(6, 182, 212, 0.15);
+            border-color: rgba(6, 182, 212, 0.6);
+            box-shadow: 0 8px 24px rgba(6, 182, 212, 0.08);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        
+        /* InfoWindow Dengeli Cam Tasarımı */
+        .gm-style-iw {
+            background: rgba(255, 255, 255, 0.85) !important;
+            backdrop-filter: blur(8px) saturate(180%) !important;
+            -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.8) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06) !important;
+            padding: 12px !important;
+        }
+        .gm-style-iw-d { overflow: hidden !important; }
+        .gm-style-iw-c { background-color: transparent !important; box-shadow: none !important; }
+        .gm-ui-hover-effect { top: 6px !important; right: 6px !important; }
+    </style>
+</head>
+<body class="bg-[#f4f7fb] text-slate-900 font-sans h-screen w-screen overflow-hidden relative">
+
+    <!-- HARİTA KATMANI -->
+    <div id="map" class="absolute inset-0 w-full h-full z-0"></div>
+
+    <!-- SOL PANEL -->
+    <div class="absolute top-6 left-6 z-10 w-96 max-h-[92vh] flex flex-col gap-5 premium-glass-panel rounded-2xl p-6">
+        
+        <!-- Üst Başlık -->
+        <div>
+            <h1 class="text-2xl font-black tracking-widest bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                BOĞAZAUTO
+            </h1>
+            <p class="text-[11px] text-slate-500 font-bold tracking-wider uppercase mt-0.5">Premium İstanbul Fleet Network</p>
+        </div>
+
+        <!-- Arama Alanı -->
+        <div class="relative">
+            <input 
+                id="search-input"
+                type="text" 
+                placeholder="Konum veya şube arayın..." 
+                class="w-full bg-white/70 border border-white/90 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-cyan-500 transition-colors placeholder-slate-400 shadow-sm"
+            >
+            <span class="absolute right-4 top-3.5 text-slate-400 text-sm">🔍</span>
+        </div>
+
+        <!-- Genişletilmiş Şube Listesi -->
+        <div class="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar" id="branch-list">
+            <p class="text-xs font-bold uppercase tracking-wider text-cyan-600 mb-1">Aktif İstanbul Şubeleri</p>
+            <!-- JS Dinamik Yükleme -->
+        </div>
+
+        <!-- Alt Bilgiler -->
+        <div class="pt-3 border-t border-black/5 text-center text-[10px] text-slate-500 font-semibold tracking-wide space-y-0.5">
+            <div>PostgreSQL Veri Havuzu & Dağıtık Ağ</div>
+            <div class="text-cyan-600">Dengeli Okunurluk / Güvenli Yönlendirme Aktif</div>
+        </div>
+    </div>
+
+    <!-- GOOGLE MAPS API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA5ekXkrP7uqWzqHVXRBblv1MnqJo8DbuI&libraries=places&callback=initMap" async defer></script>
+
+    <script>
+        // İstanbul'u ortalayacak genel koordinat
+        const ISTANBUL_CENTER = { lat: 41.025, lng: 28.920 };
+        
+        // Genişletilmiş İstanbul Şube Ağı (Hem Avrupa hem Anadolu Yakası genişletildi)
+        const branchData = [
+            // --- AVRUPA YAKASI ---
+            { id: 1, name: "GRSCAR - Beylikdüzü", brand: "GRSCAR", address: "Metrobüs Durağı Yanı Çamlık", phone: "444 9 505", lat: 41.0022, lng: 28.6440, url: "https://www.grscar.com" },
+            { id: 2, name: "Enterprise Rent-A-Car - Bahçeşehir", brand: "Enterprise", address: "Tahtakale Mah Fırat 1 Cad No:4", phone: "(0212) 970 39 12", lat: 41.0665, lng: 28.6948, url: "https://www.enterprise.com.tr" },
+            { id: 3, name: "Avec Rent a Car - Tekstilkent", brand: "Avec", address: "Oruçreis, Tekstilkent Cd. No:12", phone: "444 0 556", lat: 41.0682, lng: 28.8625, url: "https://www.avecrentacar.com" },
+            { id: 4, name: "Rent Go - Yenibosna Airport AVM", brand: "Rent Go", address: "Londra Asfaltı Kuleli Mevkii", phone: "444 4 061", lat: 40.9945, lng: 28.8322, url: "https://www.rentgo.com" },
+            { id: 5, name: "Enterprise - İstanbul Havalimanı", brand: "Enterprise", address: "Gelen Yolcu Katı, Arnavutköy", phone: "(0212) 970 39 00", lat: 41.2612, lng: 28.7420, url: "https://www.enterprise.com.tr" },
+            { id: 6, name: "Avec Rent a Car - Florya", brand: "Avec", address: "Şenlikköy, Yeşilköy Caddesi No:22", phone: "444 0 556", lat: 40.9715, lng: 28.7990, url: "https://www.avecrentacar.com" },
+            
+            // --- ANADOLU YAKASI ---
+            { id: 7, name: "Rent Go - Sabiha Gökçen Havalimanı", brand: "Rent Go", address: "Terminal Binası, Pendik", phone: "444 4 061", lat: 40.8986, lng: 29.3092, url: "https://www.rentgo.com" },
+            { id: 8, name: "GRSCAR - Kadıköy", brand: "GRSCAR", address: "Eğitim Mah. Fahrettin Kerim Gökay Cd.", phone: "444 9 505", lat: 40.9850, lng: 29.0440, url: "https://www.grscar.com" },
+            { id: 9, name: "Enterprise - Ataşehir Finans Merkezi", brand: "Enterprise", address: "Barbaros Mah. Begonya Sokak", phone: "(0212) 970 39 34", lat: 40.9920, lng: 29.1110, url: "https://www.enterprise.com.tr" },
+            { id: 10, name: "Rent Go - Kartal Sahil", brand: "Rent Go", address: "Kordonboyu Mah. Ankara Caddesi", phone: "444 4 061", lat: 40.8870, lng: 29.1845, url: "https://www.rentgo.com" }
+        ];
+
+        let map;
+        let markers = [];
+        let activeInfoWindow = null;
+
+        // Harita Katmanının Dengeli Görünmesi İçin Açık Gri Soft Stil
+        const lightMapStyles = [
+            { elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+            { elementType: "labels.icon", stylers: [{ visibility: "on" }] },
+            { elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+            { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] }
+        ];
+
+        function redirectToWebsite(url) {
+            if(url) {
+                const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                if (newWindow) newWindow.opener = null;
+            }
+        }
+
+        function initMap() {
+            // Başlangıç zoom seviyesi 10 yapıldı ki tüm ağ (Beylikdüzü'nden Sabiha Gökçen'e kadar) tek bakışta görünsün
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: ISTANBUL_CENTER,
+                zoom: 10, 
+                styles: lightMapStyles,
+                disableDefaultUI: true,
+                zoomControl: true
+            });
+
+            const input = document.getElementById("search-input");
+            const autocomplete = new google.maps.places.Autocomplete(input, { componentRestrictions: { country: "tr" } });
+            autocomplete.addListener("place_changed", () => {
+                const place = autocomplete.getPlace();
+                if (place.geometry && place.geometry.location) {
+                    map.panTo(place.geometry.location);
+                    map.setZoom(14);
+                }
+            });
+
+            renderBranchList();
+            renderMarkers();
+        }
+
+        function renderBranchList() {
+            const listContainer = document.getElementById("branch-list");
+            branchData.forEach(branch => {
+                const card = document.createElement("div");
+                card.id = `branch-card-${branch.id}`;
+                card.className = "premium-glass-card p-4 rounded-xl cursor-pointer space-y-2 shadow-sm";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-bold text-sm tracking-wide text-slate-800 leading-tight">${branch.name}</h3>
+                        <span class="text-[10px] bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full font-bold uppercase">${branch.brand}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">${branch.address}</p>
+                    <div class="flex justify-between items-center pt-1 text-xs">
+                        <span class="text-slate-400 font-medium">📞 ${branch.phone}</span>
+                        <button onclick="event.stopPropagation(); redirectToWebsite('${branch.url}')" class="text-white font-bold transition-all bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 px-3 py-1.5 rounded-lg shadow-sm">
+                            Sitede Aç &rarr;
+                        </button>
+                    </div>
+                `;
+                card.addEventListener("click", () => focusOnBranch(branch));
+                listContainer.appendChild(card);
+            });
+        }
+
+        function renderMarkers() {
+            branchData.forEach(branch => {
+                const marker = new google.maps.Marker({
+                    position: { lat: branch.lat, lng: branch.lng },
+                    map: map,
+                    title: branch.name,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 11,
+                        fillColor: "#06b6d4",
+                        fillOpacity: 1,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 2.5,
+                    }
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="max-width: 200px; font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #0f172a; padding: 2px;">
+                            <h4 style="margin:0 0 4px 0; font-size:13px; font-weight:800; color: #1e293b;">${branch.name}</h4>
+                            <p style="margin:0 0 8px 0; font-size:11px; color:#64748b; font-weight: 500; line-height: 1.3;">${branch.address}</p>
+                            <button onclick="redirectToWebsite('${branch.url}')" style="display: block; width: 100%; text-align: center; background: linear-gradient(135deg, #06b6d4, #3b82f6); color: white; font-size: 11px; font-weight: bold; padding: 8px 0; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);">
+                                Web Sitesine Git
+                            </button>
+                        </div>
+                    `
+                });
+
+                marker.addListener("click", () => openInfoWindow(infoWindow, marker, branch.id));
+                markers.push({ id: branch.id, markerInstance: marker, infoWindowInstance: infoWindow });
+            });
+        }
+
+        function focusOnBranch(branch) {
+            const target = markers.find(m => m.id === branch.id);
+            if (target) {
+                map.panTo({ lat: branch.lat, lng: branch.lng });
+                map.setZoom(14);
+                openInfoWindow(target.infoWindowInstance, target.markerInstance, branch.id);
+            }
+        }
+
+        function openInfoWindow(infoWindow, marker, branchId) {
+            if (activeInfoWindow) activeInfoWindow.close();
+            infoWindow.open(map, marker);
+            activeInfoWindow = infoWindow;
+
+            document.querySelectorAll('.premium-glass-card').forEach(card => card.classList.remove('active'));
+            const activeCard = document.getElementById(`branch-card-${branchId}`);
+            if (activeCard) {
+                activeCard.classList.add('active');
+                activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    </script>
+</body>
+</html>
